@@ -1,0 +1,22 @@
+{
+  "name": "@wahaha216/koishi-plugin-webhook-trigger",
+  "description": "处理webhook请求，并使用handlebars格式化",
+  "version": "0.0.1",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "license": "MIT",
+  "scripts": {},
+  "keywords": [
+    "chatbot",
+    "koishi",
+    "plugin"
+  ],
+  "devDependencies": {},
+  "peerDependencies": {
+    "koishi": "4.17.8"
+  }
+}
