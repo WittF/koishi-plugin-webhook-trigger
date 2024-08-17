@@ -92,7 +92,7 @@ export function apply(ctx: Context, config: Config) {
           if (config.printResult) {
             logger.info(result);
           }
-          if (!result.length) return;
+          if (!result.length) return (content.status = 200);
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
               await bot.sendMessage(channelId, result);
@@ -101,6 +101,7 @@ export function apply(ctx: Context, config: Config) {
               await bot.sendPrivateMessage(privateId, result);
             }
           }
+          return (content.status = 200)
         }
       );
     } else {
@@ -124,7 +125,7 @@ export function apply(ctx: Context, config: Config) {
           if (config.printResult) {
             logger.info(result);
           }
-          if (!result.length) return;
+          if (!result.length) return (content.status = 200);
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
               await bot.sendMessage(channelId, result);
@@ -133,6 +134,7 @@ export function apply(ctx: Context, config: Config) {
               await bot.sendPrivateMessage(privateId, result);
             }
           }
+          return (content.status = 200);
         }
       );
     }
