@@ -1,0 +1,16 @@
+_config:
+  - $desc: Global setting
+    defaultPrefix: Add /webhook prefix
+  - $desc: Listener settings
+    listeners: 
+      $desc: List of listeners
+      url: Listening address
+      method: Listening methods
+      headers: Request header verification
+      pushChannelIds: 
+        $desc: Push channel list
+        $inner: Channel ID
+      pushPrivateIds: 
+        $desc: Pushed private list
+        $inner: User ID
+      msg: Push message

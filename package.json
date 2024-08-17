@@ -15,8 +15,26 @@
     "koishi",
     "plugin"
   ],
-  "devDependencies": {},
   "peerDependencies": {
     "koishi": "4.17.8"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.8"
+  },
+  "koishi": {
+    "description": {
+      "en": "Processing webhook requests and formatting them with handlebars",
+      "zh": "处理webhook请求，并使用handlebars格式化"
+    },
+    "service": {
+      "required": [
+        "server",
+        "logger"
+      ]
+    },
+    "locales": [
+      "en",
+      "zh"
+    ]
   }
 }

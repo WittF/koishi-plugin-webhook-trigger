@@ -1,0 +1,16 @@
+_config:
+  - $desc: 全局设置
+    defaultPrefix: 添加/webhook前缀
+  - $desc: 监听器设置
+    listeners: 
+      $desc: 监听器列表
+      url: 监听地址
+      method: 监听方法
+      headers: 请求头校验
+      pushChannelIds: 
+        $desc: 推送的频道列表
+        $inner: 频道ID
+      pushPrivateIds: 
+        $desc: 推送的私聊列表
+        $inner: 用户ID
+      msg: 推送的消息
