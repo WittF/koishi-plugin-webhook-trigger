@@ -51,6 +51,16 @@ export function apply(ctx: Context, config: Config) {
     return p === q ? options.fn(this) : options.inverse(this);
   });
 
+  logger.info("Register Handlebars Helper: if_not_equals");
+  Handlebars.registerHelper("if_not_equals", function (p, q, options) {
+    return p !== q ? options.fn(this) : options.inverse(this);
+  });
+
+  logger.info("Register Handlebars Helper: if_exist");
+  Handlebars.registerHelper("if_exist", function (p, options) {
+    return (this as Object).hasOwnProperty(p) ? options.fn(this) : options.inverse(this);
+  });
+
   for (const ls of config.listeners) {
     const prefix = config.defaultPrefix ? `/webhook` : "";
     const url = ls.url.startsWith("/") ? ls.url : `/${ls.url}`;
