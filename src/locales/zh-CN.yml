@@ -1,6 +1,8 @@
 _config:
   - $desc: 全局设置
     defaultPrefix: 添加/webhook前缀
+    printData: 输出接收到的数据
+    printResult: 输出格式化结果
   - $desc: 监听器设置
     listeners: 
       $desc: 监听器列表

@@ -1,6 +1,8 @@
 _config:
   - $desc: Global setting
     defaultPrefix: Add /webhook prefix
+    printData: Print received data
+    printResult: Print formatting results
   - $desc: Listener settings
     listeners: 
       $desc: List of listeners

@@ -18,12 +18,16 @@ interface Listenners {
 }
 export interface Config {
   defaultPrefix: boolean;
+  printData: boolean;
+  printResult: boolean;
   listeners: Listenners[];
 }
 
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
     defaultPrefix: Schema.boolean().default(true),
+    printData: Schema.boolean().default(false),
+    printResult: Schema.boolean().default(false),
   }),
   Schema.object({
     listeners: Schema.array(
@@ -58,7 +62,9 @@ export function apply(ctx: Context, config: Config) {
 
   logger.info("Register Handlebars Helper: if_exist");
   Handlebars.registerHelper("if_exist", function (p, options) {
-    return (this as Object).hasOwnProperty(p) ? options.fn(this) : options.inverse(this);
+    return (this as Object).hasOwnProperty(p)
+      ? options.fn(this)
+      : options.inverse(this);
   });
 
   for (const ls of config.listeners) {
@@ -78,8 +84,14 @@ export function apply(ctx: Context, config: Config) {
         },
         async (content) => {
           logger.info(`get: ${fullUrl}`);
+          if (config.printData) {
+            logger.info(content.request.query);
+          }
           const template = Handlebars.compile(ls.msg);
           const result = template(content.request.query);
+          if (config.printResult) {
+            logger.info(result);
+          }
           if (!result.length) return;
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
@@ -104,8 +116,14 @@ export function apply(ctx: Context, config: Config) {
         },
         async (content) => {
           logger.info(`post: ${fullUrl}`);
+          if (config.printData) {
+            logger.info(content.request.body);
+          }
           const template = Handlebars.compile(ls.msg);
           const result = template(content.request.body);
+          if (config.printResult) {
+            logger.info(result);
+          }
           if (!result.length) return;
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
