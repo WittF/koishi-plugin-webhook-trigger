@@ -70,6 +70,7 @@ export function apply(ctx: Context, config: Config) {
           logger.info(`get: ${fullUrl}`);
           const template = Handlebars.compile(ls.msg);
           const result = template(content.request.query);
+          if (!result.length) return;
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
               await bot.sendMessage(channelId, result);
@@ -95,6 +96,7 @@ export function apply(ctx: Context, config: Config) {
           logger.info(`post: ${fullUrl}`);
           const template = Handlebars.compile(ls.msg);
           const result = template(content.request.body);
+          if (!result.length) return;
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
               await bot.sendMessage(channelId, result);
