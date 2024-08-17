@@ -1,7 +1,7 @@
 {
   "name": "@wahaha216/koishi-plugin-webhook-trigger",
   "description": "处理webhook请求，并使用handlebars格式化",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -16,7 +16,7 @@
     "plugin"
   ],
   "peerDependencies": {
-    "koishi": "4.17.8"
+    "koishi": "^4.17.8"
   },
   "dependencies": {
     "handlebars": "^4.7.8"
