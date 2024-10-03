@@ -85,11 +85,18 @@ export async function apply(ctx: Context, config: Config) {
         next();
       },
       async (content) => {
-        logger.info(`${type}: ${fullUrl}`);
-        const data =
+        let data =
           type === "get" ? content.request.query : content.request.body;
+        logger.info(`${type}: ${fullUrl}, incoming data type: ${typeof data}`);
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch (error) {
+            logger.error(error);
+          }
+        }
         if (config.printData) {
-          logger.info(data, typeof data);
+          logger.info(data);
         }
         const template = Handlebars.compile(t);
         const result = template(data);
