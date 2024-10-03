@@ -46,7 +46,7 @@ export const Config: Schema<Config> = Schema.intersect([
   "en-US": require("./locales/en-US")._config,
 });
 
-export function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   // write your plugin here
   const logger = ctx.logger("wahaha216-webhook");
 
@@ -67,32 +67,36 @@ export function apply(ctx: Context, config: Config) {
       : options.inverse(this);
   });
 
-  for (const ls of config.listeners) {
+  const pushMsg = async (type: "get" | "post", ls: Listenners, t: string) => {
     const prefix = config.defaultPrefix ? `/webhook` : "";
     const url = ls.url.startsWith("/") ? ls.url : `/${ls.url}`;
     const fullUrl = `${prefix}${url}`;
-    if (ls.method === "get") {
-      ctx.server.get(
-        fullUrl,
-        (content, next) => {
-          for (let httpheader in ls.headers) {
-            // 检查头，如果不相等则返回400
-            if (content.header[httpheader] != ls.headers[httpheader])
-              return (content.status = 400);
+    ctx.server[type](
+      fullUrl,
+      (content, next) => {
+        for (let httpheader in ls.headers) {
+          // 检查头，如果不相等则返回400
+          if (content.header[httpheader] != ls.headers[httpheader]) {
+            content.status = 400;
+            content.body = "header not match";
+            return;
           }
-          next();
-        },
-        async (content) => {
-          logger.info(`get: ${fullUrl}`);
-          if (config.printData) {
-            logger.info(content.request.query);
-          }
-          const template = Handlebars.compile(ls.msg);
-          const result = template(content.request.query);
-          if (config.printResult) {
-            logger.info(result);
-          }
-          if (!result.length) return (content.status = 200);
+        }
+        next();
+      },
+      async (content) => {
+        logger.info(`${type}: ${fullUrl}`);
+        const data =
+          type === "get" ? content.request.query : content.request.body;
+        if (config.printData) {
+          logger.info(data, typeof data);
+        }
+        const template = Handlebars.compile(t);
+        const result = template(data);
+        if (config.printResult) {
+          logger.info(result);
+        }
+        if (result.length) {
           for (const bot of ctx.bots) {
             for (const channelId of ls.pushChannelIds) {
               await bot.sendMessage(channelId, result);
@@ -101,42 +105,14 @@ export function apply(ctx: Context, config: Config) {
               await bot.sendPrivateMessage(privateId, result);
             }
           }
-          return (content.status = 200)
         }
-      );
-    } else {
-      ctx.server.post(
-        fullUrl,
-        (content, next) => {
-          for (let httpheader in ls.headers) {
-            // 检查头，如果不相等则返回400
-            if (content.header[httpheader] != ls.headers[httpheader])
-              return (content.status = 400);
-          }
-          next();
-        },
-        async (content) => {
-          logger.info(`post: ${fullUrl}`);
-          if (config.printData) {
-            logger.info(content.request.body);
-          }
-          const template = Handlebars.compile(ls.msg);
-          const result = template(content.request.body);
-          if (config.printResult) {
-            logger.info(result);
-          }
-          if (!result.length) return (content.status = 200);
-          for (const bot of ctx.bots) {
-            for (const channelId of ls.pushChannelIds) {
-              await bot.sendMessage(channelId, result);
-            }
-            for (const privateId of ls.pushPrivateIds) {
-              await bot.sendPrivateMessage(privateId, result);
-            }
-          }
-          return (content.status = 200);
-        }
-      );
-    }
+        content.status = 200;
+        content.body = "ok";
+      }
+    );
+  };
+
+  for (const ls of config.listeners) {
+    await pushMsg(ls.method, ls, ls.msg);
   }
 }
