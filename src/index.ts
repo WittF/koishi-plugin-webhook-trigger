@@ -70,14 +70,14 @@ export async function apply(ctx: Context, config: Config) {
   logger.info("Register Handlebars Helper: image");
   Handlebars.registerHelper("image", function (url: string) {
     if (!url) return "";
-    return `<image:${url}>`;
+    return new Handlebars.SafeString(`<image:${url}>`);
   });
 
   // 🚀 AT消息
   logger.info("Register Handlebars Helper: at");
   Handlebars.registerHelper("at", function (userId: string) {
     if (!userId) return "";
-    return `<at:${userId}>`;
+    return new Handlebars.SafeString(`<at:${userId}>`);
   });
 
   // 🚀 多个AT
@@ -85,7 +85,7 @@ export async function apply(ctx: Context, config: Config) {
   Handlebars.registerHelper("at_users", function (userIds: string | string[]) {
     if (!userIds) return "";
     const users = Array.isArray(userIds) ? userIds : [userIds];
-    return users.map(id => `<at:${id}>`).join("");
+    return new Handlebars.SafeString(users.map(id => `<at:${id}>`).join(""));
   });
 
   // 🚀 文本转图片
@@ -97,7 +97,7 @@ export async function apply(ctx: Context, config: Config) {
     if (/\{\{\s*(image|text_to_image|at|at_users)\s+/.test(content)) {
       logger.warn("text_to_image 不支持嵌套富文本 helper (image/text_to_image/at/at_users)");
       const warningContent = "⚠️ 不支持的嵌套语法\n请将富文本元素与 text_to_image 分开使用";
-      return `<text2img:${Buffer.from(warningContent).toString('base64')}>`;
+      return new Handlebars.SafeString(`<text2img:${Buffer.from(warningContent).toString('base64')}>`);
     }
     
     // 🔧 先渲染内部的 Handlebars 语法（基础变量和条件）
@@ -111,22 +111,22 @@ export async function apply(ctx: Context, config: Config) {
       if (renderedContent.includes('<image:') || renderedContent.includes('<text2img:') || renderedContent.includes('<at:')) {
         logger.warn("text_to_image 内容包含富文本标记，可能存在不当嵌套");
         const cleanContent = renderedContent.replace(/<(image|text2img|at):[^>]+>/g, '[不支持的嵌套元素]');
-        return `<text2img:${Buffer.from(cleanContent).toString('base64')}>`;
+        return new Handlebars.SafeString(`<text2img:${Buffer.from(cleanContent).toString('base64')}>`);
       }
       
       // 📏 内容长度检查
       if (renderedContent.length > 5000) {
         logger.warn("text_to_image 内容过长，可能影响渲染性能");
         const truncatedContent = renderedContent.substring(0, 5000) + "\n...[内容过长已截断]";
-        return `<text2img:${Buffer.from(truncatedContent).toString('base64')}>`;
+        return new Handlebars.SafeString(`<text2img:${Buffer.from(truncatedContent).toString('base64')}>`);
       }
       
-      return `<text2img:${Buffer.from(renderedContent).toString('base64')}>`;
+      return new Handlebars.SafeString(`<text2img:${Buffer.from(renderedContent).toString('base64')}>`);
     } catch (error) {
       // 如果内部模板解析失败，使用原始内容
       logger.error("text_to_image 内部模板解析失败:", error);
       const errorContent = `❌ 模板解析错误\n原始内容：${content}`;
-      return `<text2img:${Buffer.from(errorContent).toString('base64')}>`;
+      return new Handlebars.SafeString(`<text2img:${Buffer.from(errorContent).toString('base64')}>`);
     }
   });
 
