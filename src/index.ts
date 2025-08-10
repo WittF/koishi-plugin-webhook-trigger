@@ -187,37 +187,43 @@ export async function apply(ctx: Context, config: Config) {
           </html>
         `;
 
-        const imageBuffer = await puppeteer.render(html, async (page: any) => {
+              const imageBuffer = await puppeteer.render(html, async (page: any, next: any) => {
+        try {
           // 🎯 设置页面视口和超时
           await page.setViewport({ width: 1200, height: 800, deviceScaleFactor: 2 });
           
           // ⏰ 设置超时时间
           page.setDefaultTimeout(10000); // 10秒超时
           
-          try {
-            // 等待内容加载
-            await page.waitForSelector('.content', { timeout: 5000 });
-            
-            // 等待字体加载（如果有的话）
-            await page.evaluate(() => {
-              return document.fonts ? document.fonts.ready : Promise.resolve();
-            });
-            
-            const element = await page.$('.content');
-            if (!element) {
-              throw new Error('找不到内容元素');
-            }
-            
-            return await element.screenshot({ 
-              type: 'png',
-              omitBackground: false,
-              captureBeyondViewport: true 
-            });
-          } catch (renderError) {
-            logger.error('页面渲染失败:', renderError);
-            throw renderError;
+          // 等待内容加载
+          await page.waitForSelector('.content', { timeout: 5000 });
+          
+          // 等待字体加载（如果有的话）
+          await page.evaluate(() => {
+            return document.fonts ? document.fonts.ready : Promise.resolve();
+          });
+          
+          // 额外等待确保渲染完成
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          const element = await page.$('.content');
+          if (!element) {
+            throw new Error('找不到内容元素');
           }
-        });
+          
+          const screenshot = await element.screenshot({ 
+            type: 'png',
+            omitBackground: false,
+            captureBeyondViewport: true 
+          });
+          
+          logger.info('文本转图片截图成功');
+          return screenshot;
+        } catch (renderError) {
+          logger.error('页面渲染失败:', renderError);
+          throw renderError;
+        }
+      });
 
         // 这里应该将图片上传到图床，返回URL
         // 为了简化，我们返回 base64 data URL
@@ -276,10 +282,13 @@ export async function apply(ctx: Context, config: Config) {
             // 🎨 处理文本转图片
             try {
               const textContent = Buffer.from(content, 'base64').toString('utf8');
+              logger.info(`正在将文本转换为图片: "${textContent}"`);
               const imageUrl = await textToImageService.convertTextToImage(textContent);
               if (imageUrl) {
+                logger.info('文本转图片成功，图片URL长度:', imageUrl.length);
                 elements.push(h.image(imageUrl));
               } else {
+                logger.warn('文本转图片失败，回退到文本显示');
                 // 如果转图片失败，回退到文本
                 elements.push(h.text(textContent));
               }

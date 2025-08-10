@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-webhook-trigger",
   "description": "强大的Webhook处理插件，支持Handlebars模板和富文本消息（图片、AT、文本转图片）",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -18,8 +18,7 @@
     "plugin"
   ],
   "peerDependencies": {
-    "koishi": "^4.17.8",
-    "@koishijs/plugin-puppeteer": "^3.0.0"
+    "koishi": "^4.17.8"
   },
   "dependencies": {
     "handlebars": "^4.7.8"
@@ -36,6 +35,9 @@
       "required": [
         "server",
         "logger"
+      ],
+      "optional": [
+        "puppeteer"
       ]
     },
     "locales": [
