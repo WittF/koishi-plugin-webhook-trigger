@@ -1,24 +1,22 @@
 {
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib",
-    "target": "es2022",
-    "module": "ESNext",
+    "target": "ES2020",
+    "module": "commonjs",
     "declaration": true,
-    "composite": true,
-    "incremental": true,
-    "skipLibCheck": true,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "strict": true,
     "esModuleInterop": true,
-    "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
-    "jsxImportSource": "@satorijs/element",
-    "types": [
-      "node",
-      "yml-register/types"
-    ],
-    "emitDeclarationOnly": true
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true
   },
   "include": [
-    "src"
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "lib"
   ]
 }
