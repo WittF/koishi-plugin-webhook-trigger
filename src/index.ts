@@ -88,14 +88,20 @@ export async function apply(ctx: Context, config: Config) {
     return new Handlebars.SafeString(users.map(id => `<at:${id}>`).join(""));
   });
 
+  // 🚀 AT全体成员
+  logger.info("Register Handlebars Helper: at_all");
+  Handlebars.registerHelper("at_all", function () {
+    return new Handlebars.SafeString(`<at type="all">`);
+  });
+
   // 🚀 文本转图片
   logger.info("Register Handlebars Helper: text_to_image");
   Handlebars.registerHelper("text_to_image", function (this: any, content: string, options: any) {
     if (!content) return "";
     
     // ⚠️ 检测不支持的嵌套情况（富文本 helper）
-    if (/\{\{\s*(image|text_to_image|at|at_users)\s+/.test(content)) {
-      logger.warn("text_to_image 不支持嵌套富文本 helper (image/text_to_image/at/at_users)");
+    if (/\{\{\s*(image|text_to_image|at|at_users|at_all)\s+/.test(content)) {
+      logger.warn("text_to_image 不支持嵌套富文本 helper (image/text_to_image/at/at_users/at_all)");
       const warningContent = "⚠️ 不支持的嵌套语法\n请将富文本元素与 text_to_image 分开使用";
       return new Handlebars.SafeString(`<text2img:${Buffer.from(warningContent).toString('base64')}>`);
     }
@@ -428,7 +434,7 @@ export async function apply(ctx: Context, config: Config) {
   };
 
   // 🚀 解析富文本消息标记为 Element 数组
-  const parseRichMessage = async (message: string): Promise<Element[]> => {
+  const parseRichMessage = async (message: string, isPrivateMessage: boolean = false): Promise<Element[]> => {
     if (!message) return [];
 
     if (config.debug) {
@@ -437,7 +443,8 @@ export async function apply(ctx: Context, config: Config) {
     const elements: Element[] = [];
     
     // 🔧 优化分割逻辑，处理特殊标记
-    const regex = /<(image|at|text2img):([^>]+)>/g;
+    // 支持两种格式：<at:userId> 和 <at type="all">
+    const regex = /<(image|text2img):([^>]+)>|<(at):([^>]+)>|<(at)\s+type="all">/g;
     let lastIndex = 0;
     let match;
     
@@ -455,7 +462,24 @@ export async function apply(ctx: Context, config: Config) {
         elements.push(h.text(beforeText));
       }
       
-      const [fullMatch, type, content] = match;
+      // 解析不同的匹配组
+      let type: string, content: string;
+      
+      if (match[1]) {
+        // <image:url> 或 <text2img:content>
+        type = match[1];
+        content = match[2];
+      } else if (match[3]) {
+        // <at:userId>
+        type = match[3];
+        content = match[4];
+      } else if (match[5]) {
+        // <at type="all">
+        type = match[5];
+        content = "all"; // 只支持 "all"
+      } else {
+        continue; // 跳过无效匹配
+      }
       
       try {
         switch (type) {
@@ -471,11 +495,35 @@ export async function apply(ctx: Context, config: Config) {
             
           case 'at':
             // 👥 处理AT
-            if (content && /^\d+$/.test(content)) {
-              elements.push(h.at(content));
+            if (content === 'all') {
+              // 处理@全体成员
+              if (isPrivateMessage) {
+                // 私聊中过滤@全体功能
+                if (config.debug) {
+                  logger.info(`私聊中跳过@全体成员`);
+                }
+                elements.push(h.text(`@全体成员`));
+              } else {
+                // 群聊中正常处理@全体
+                elements.push(h.at('all')); // @全体成员
+              }
             } else {
-              logger.warn(`无效的用户ID: ${content}`);
-              elements.push(h.text(`@${content}`));
+              // 处理@特定用户
+              if (isPrivateMessage) {
+                // 私聊中过滤@功能，转换为普通文本
+                if (config.debug) {
+                  logger.info(`私聊中跳过@用户: ${content}`);
+                }
+                elements.push(h.text(`@${content}`));
+              } else {
+                // 群聊中正常处理@
+                if (content && /^\d+$/.test(content)) {
+                  elements.push(h.at(content));
+                } else {
+                  logger.warn(`无效的用户ID: ${content}`);
+                  elements.push(h.text(`@${content}`));
+                }
+              }
             }
             break;
             
@@ -505,7 +553,7 @@ export async function apply(ctx: Context, config: Config) {
             
           default:
             logger.warn(`未知的富文本类型: ${type}`);
-            elements.push(h.text(fullMatch));
+            elements.push(h.text(`[未知类型: ${type}]`));
         }
       } catch (error) {
         logger.error(`处理富文本元素失败 [${type}]:`, error);
@@ -562,13 +610,27 @@ export async function apply(ctx: Context, config: Config) {
         }
         if (result.length) {
           // 🚀 富文本消息（默认启用）
-          const elements = await parseRichMessage(result);
           for (const bot of ctx.bots) {
-            for (const channelId of ls.pushChannelIds) {
-              await bot.sendMessage(channelId, elements);
+            // 群聊消息 - 保留@功能
+            if (ls.pushChannelIds && ls.pushChannelIds.length > 0) {
+              if (config.debug) {
+                logger.info(`解析群聊消息，保留@功能，目标群数量: ${ls.pushChannelIds.length}`);
+              }
+              const channelElements = await parseRichMessage(result, false);
+              for (const channelId of ls.pushChannelIds) {
+                await bot.sendMessage(channelId, channelElements);
+              }
             }
-            for (const privateId of ls.pushPrivateIds) {
-              await bot.sendPrivateMessage(privateId, elements);
+            
+            // 私聊消息 - 过滤@功能
+            if (ls.pushPrivateIds && ls.pushPrivateIds.length > 0) {
+              if (config.debug) {
+                logger.info(`解析私聊消息，过滤@功能，目标私聊数量: ${ls.pushPrivateIds.length}`);
+              }
+              const privateElements = await parseRichMessage(result, true);
+              for (const privateId of ls.pushPrivateIds) {
+                await bot.sendPrivateMessage(privateId, privateElements);
+              }
             }
           }
         }
