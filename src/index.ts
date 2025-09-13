@@ -16,6 +16,7 @@ interface Listenners {
   pushChannelIds: string[];
   pushPrivateIds: string[];
   msg: string;
+  forwardUrl?: string;  // 可选的转发URL
 }
 export interface Config {
   defaultPrefix: boolean;
@@ -37,6 +38,7 @@ export const Config: Schema<Config> = Schema.intersect([
         pushChannelIds: Schema.array(String),
         pushPrivateIds: Schema.array(String),
         msg: Schema.string().role("textarea"),
+        forwardUrl: Schema.string().description("转发URL（可选）：将完整请求转发到此URL，留空则不启用转发").default(""),
       })
     ),
   }),
@@ -576,6 +578,13 @@ export async function apply(ctx: Context, config: Config) {
     const prefix = config.defaultPrefix ? `/webhook` : "";
     const url = ls.url.startsWith("/") ? ls.url : `/${ls.url}`;
     const fullUrl = `${prefix}${url}`;
+    
+    // 🔍 调试信息：显示注册的路由（仅debug模式）
+    if (config.debug) {
+      logger.info(`🚀 注册 ${type.toUpperCase()} 路由: ${fullUrl}`);
+      logger.info(`📝 配置详情: url="${ls.url}", prefix="${prefix}", defaultPrefix=${config.defaultPrefix}`);
+    }
+    
     ctx.server[type](
       fullUrl,
       (content, next) => {
@@ -583,7 +592,14 @@ export async function apply(ctx: Context, config: Config) {
           // 检查头，如果不相等则返回400
           if (content.header[httpheader] != ls.headers[httpheader]) {
             content.status = 400;
-            content.body = "header not match";
+            content.type = "application/json";
+            content.body = JSON.stringify({
+              success: false,
+              error: "Header 验证失败",
+              expected: ls.headers,
+              received: content.header,
+              route: fullUrl
+            });
             return;
           }
         }
@@ -634,8 +650,116 @@ export async function apply(ctx: Context, config: Config) {
             }
           }
         }
+        
+        // 🔀 转发功能（如果配置了 forwardUrl）
+        let forwardResult = null;
+        if (ls.forwardUrl && ls.forwardUrl.trim()) {
+          try {
+            if (config.debug) {
+              logger.info(`🔀 开始转发请求到: ${ls.forwardUrl}`);
+            }
+            
+            // 准备转发的数据和headers
+            const forwardHeaders: Record<string, string> = {};
+            
+            // 复制原始headers，确保类型安全
+            Object.entries(content.request.headers || {}).forEach(([key, value]) => {
+              if (typeof value === 'string') {
+                forwardHeaders[key] = value;
+              }
+            });
+            
+            // 添加自定义headers
+            forwardHeaders["User-Agent"] = "Koishi-Webhook-Forward/1.0";
+            forwardHeaders["X-Forwarded-From"] = fullUrl;
+            
+            // 移除可能导致问题的headers
+            delete forwardHeaders["host"];
+            delete forwardHeaders["content-length"];
+            
+            const fetchOptions: RequestInit = {
+              method: type.toUpperCase(),
+              headers: forwardHeaders,
+            };
+            
+            // 根据请求类型添加body或query参数
+            if (type === "post") {
+              if (typeof content.request.body === "string") {
+                fetchOptions.body = content.request.body;
+              } else if (content.request.body) {
+                fetchOptions.body = JSON.stringify(content.request.body);
+                forwardHeaders["content-type"] = "application/json";
+              }
+            } else {
+              // GET请求，将query参数添加到URL
+              const url = new URL(ls.forwardUrl);
+              if (content.request.query) {
+                Object.entries(content.request.query).forEach(([key, value]) => {
+                  if (typeof value === 'string') {
+                    url.searchParams.set(key, value);
+                  }
+                });
+              }
+              fetchOptions.method = "GET";
+            }
+            
+            // 构建转发URL
+            let forwardUrl = ls.forwardUrl;
+            if (type === "get" && content.request.query) {
+              const params = new URLSearchParams();
+              Object.entries(content.request.query).forEach(([key, value]) => {
+                if (typeof value === 'string') {
+                  params.set(key, value);
+                }
+              });
+              const queryString = params.toString();
+              if (queryString) {
+                forwardUrl += (forwardUrl.includes('?') ? '&' : '?') + queryString;
+              }
+            }
+              
+            const forwardResponse = await fetch(forwardUrl, fetchOptions);
+            
+            forwardResult = {
+              success: true,
+              status: forwardResponse.status,
+              statusText: forwardResponse.statusText,
+              url: forwardUrl
+            };
+            
+            if (config.debug) {
+              logger.info(`✅ 转发成功: ${forwardResponse.status} ${forwardResponse.statusText}`);
+            }
+            
+          } catch (forwardError: unknown) {
+            const errorMessage = forwardError instanceof Error ? forwardError.message : String(forwardError);
+            forwardResult = {
+              success: false,
+              error: errorMessage,
+              url: ls.forwardUrl
+            };
+            
+            logger.error(`❌ 转发失败:`, forwardError);
+          }
+        }
+        
+        // 🎉 返回详细的成功响应
         content.status = 200;
-        content.body = "ok";
+        content.type = "application/json";
+        const response: any = {
+          success: true,
+          message: "Webhook 触发成功",
+          timestamp: new Date().toISOString(),
+          processed: result.length > 0 ? "已发送消息" : "消息为空，未发送",
+          route: fullUrl
+        };
+        
+        // 如果有转发结果，添加到响应中
+        if (forwardResult) {
+          response.forward = forwardResult;
+        }
+        
+        content.body = JSON.stringify(response);
       }
     );
   };
